@@ -17,45 +17,35 @@ from tuya_sharing import Manager, CustomerDevice, DeviceFunction
 LOGGER = logging.getLogger( nome )
 
 def patch_tuya_sharing():
-"""Applica patch a tuya_sharing per supportare DP 19"""
+    """Applica patch a tuya_sharing per supportare DP 19 su tutti i dispositivi."""
 
-# Salva il metodo originale
-original_on_device_report = Manager._on_device_report
+    original_on_device_report = Manager._on_device_report
 
-def patched_on_device_report(self, device_id: str, status: list[dict]):
-    """Versione patchata che accetta il DP 19"""
-    
-    # Per il dispositivo specifico, aggiungi il mapping DP 19 prima di processare
-    if device_id == "bffeaed51892c5c7bdxrae":
+    def patched_on_device_report(self, device_id: str, status: list[dict]):
         device = self.device_map.get(device_id)
         if device:
-            # Aggiungi work_state alla mappatura se non esiste
-            if hasattr(device, 'status_range'):
-                if 19 not in device.status_range:
-                    device.status_range[19] = "work_state"
-                    LOGGER.info(f"Added DP 19 mapping for device {device_id}")
-            
-            # Processa i dati in arrivo
+            # Cerchiamo se nel report c'è il DP 19
             for item in status:
                 if isinstance(item, dict) and item.get('dpId') == 19:
-                    # Aggiungi il code se manca
+                    # Se il dispositivo non conosce ancora il mapping per il DP 19, aggiungiamolo
+                    if hasattr(device, 'status_range') and 19 not in device.status_range:
+                        device.status_range[19] = "work_state"
+
+                    # Forza il 'code' a 'work_state' se manca
                     if 'code' not in item:
                         item['code'] = 'work_state'
-                    
+
+                    # Aggiorna lo stato interno per riflettere il cambiamento immediatamente
                     work_state_value = item.get('value')
-                    LOGGER.info(f"DP 19 received: {work_state_value}")
-                    
-                    # IMPORTANTE: Aggiorna direttamente lo status del dispositivo
-                    # Questo deve essere fatto PRIMA di chiamare il metodo originale
                     device.status['work_state'] = work_state_value
-                    LOGGER.info(f"Updated device.status['work_state'] to: {work_state_value}")
+                    LOGGER.debug(f"DP 19 generic patch: Device {device_id} updated to {work_state_value}")
+
+        return original_on_device_report(self, device_id, status)
+
+    Manager._on_device_report = patched_on_device_report
+    LOGGER.info("Applied generic tuya_sharing monkey patch for DP 19")
     
-    # Chiama il metodo originale
-    return original_on_device_report(self, device_id, status)
-
-
-Manager._on_device_report = patched_on_device_report
-LOGGER.info("Applied tuya_sharing monkey patch for DP 19")
+    
 async def async_setup_entry(hass: HomeAssistant, entry: TuyaConfigEntry) -> bool:
 """Voce di configurazione hass per la configurazione asincrona."""
 
@@ -83,32 +73,31 @@ except Exception as exc:
         raise ConfigEntryAuthFailed(msg) from exc
     raise
 
-# ===== CONFIGURA IL DISPOSITIVO PER DP 19 =====
-dev_id = "bffeaed51892c5c7bdxrae"
-if dev_id in manager.device_map:
-    device = manager.device_map[dev_id]
-    
-    # Aggiungi la funzione work_state
-    if "work_state" not in device.function:
-        device.function["work_state"] = DeviceFunction(
-            code='work_state',
-            type='Enum',
-            values='{"range":["heating","stop","idle"]}'
-        )
-        LOGGER.info(f"Added work_state function to device {dev_id}")
-    
-    # Aggiungi il mapping DP 19 -> work_state
-    if hasattr(device, 'status_range'):
-        device.status_range[19] = "work_state"
-        LOGGER.info(f"Mapped DP 19 to work_state for device {dev_id}")
-    
-    # Inizializza lo stato
-    if "work_state" not in device.status:
-        device.status["work_state"] = "stop"
-        LOGGER.info(f"Initialized work_state for device {dev_id}")
-else:
-    LOGGER.error(f"Device {dev_id} not found in device_map")
-# ===============================================
+# ===== CONFIGURAZIONE GENERICA DISPOSITIVI PER DP 19 =====
+# Cicliamo su tutti i dispositivi trovati nel manager
+for device in manager.device_map.values():
+    # Applichiamo la logica se il dispositivo è un termostato (wk) o se ha già work_state
+    # Tuya usa spesso 'wk' per Wall Heaters e termostati
+    if device.category == "wk" or "work_state" in device.status:
+
+        # Aggiungi la funzione work_state se non definita nel cloud
+        if "work_state" not in device.function:
+            device.function["work_state"] = DeviceFunction(
+                code='work_state',
+                type='Enum',
+                values='{"range":["heating","stop","idle"]}'
+            )
+
+        # Mappa il DP 19 al codice work_state nella struttura interna
+        if hasattr(device, 'status_range'):
+            device.status_range[19] = "work_state"
+
+        # Inizializza lo stato se vuoto
+        if "work_state" not in device.status:
+            device.status["work_state"] = "stop"
+
+        LOGGER.info(f"Enabled DP 19 support for device: {device.name} ({device.id})")
+# =========================================================
 
 # Connection is successful, store the manager & listener
 entry.runtime_data = HomeAssistantTuyaData(manager=manager, listener=listener)
