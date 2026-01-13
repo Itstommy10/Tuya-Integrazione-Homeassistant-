@@ -448,7 +448,6 @@ class TuyaClimateEntity(TuyaEntity, ClimateEntity):
         """Return hvac mode."""
         # 1. Recuperiamo la categoria del dispositivo
         category = self._device.get('category')
-
         # 2. Logica specifica per i Deumidificatori (category "cs")
         if category == "cs":
             # Il tuo JSON usa "Power" per l'accensione

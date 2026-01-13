@@ -41,7 +41,7 @@
     }
   ],
   "documentation": "https://www.home-assistant.io/integrations/tuya",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "integration_type": "hub",
   "iot_class": "cloud_push",
   "loggers": ["tuya_sharing"],
