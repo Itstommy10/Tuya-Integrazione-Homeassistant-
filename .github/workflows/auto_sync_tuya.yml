@@ -1,0 +1,51 @@
+name: Sincronizzazione con Conflitti (Scenario A)
+on:
+  schedule:
+    - cron: '0 0 * * *' # Ogni notte
+  workflow_dispatch:      # Per avviarlo ora manualmente
+
+jobs:
+  create-conflict-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del tuo repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configura Git
+        run: |
+          git config user.name "GitHub Action Bot"
+          git config user.email "action@github.com"
+
+      - name: Crea branch temporaneo dal Core Ufficiale
+        run: |
+          # 1. Crea un branch vuoto chiamato 'upstream-branch'
+          git checkout -b upstream-branch
+          
+          # 2. Scarica il file climate.py ufficiale di Home Assistant
+          # Lo mettiamo nello stesso percorso del tuo file
+          curl -sL https://raw.githubusercontent.com/home-assistant/core/dev/homeassistant/components/tuya/climate.py -o custom_components/tuya/climate.py
+          
+          # 3. Salva questa versione ufficiale nel branch temporaneo
+          git add custom_components/tuya/climate.py
+          git commit -m "Codice ufficiale Tuya da Home Assistant Core"
+          
+          # 4. Carica il branch temporaneo su GitHub
+          git push origin upstream-branch --force
+
+      - name: Apri Pull Request per generare il conflitto
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: upstream-branch  # Il branch con il codice ufficiale
+          base: main               # Il tuo branch con il fix Cecotec
+          title: "⚠️ AGGIORNAMENTO TUYA: Risolvi i conflitti"
+          body: |
+            L'integrazione Tuya ufficiale è cambiata.
+            
+            **Istruzioni per lo Scenario A:**
+            1. Vai in fondo a questa pagina.
+            2. Clicca sul tasto **"Resolve conflicts"**.
+            3. Usa i tasti in alto per decidere quali righe tenere.
+            4. Assicurati di mantenere il tuo fix
