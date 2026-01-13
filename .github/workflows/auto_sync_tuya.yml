@@ -1,7 +1,5 @@
-name: Sincronizzazione Reale Core (Scenario A)
+name: Sincronizzazione Reale Core (Forzata)
 on:
-  schedule:
-    - cron: '0 0 * * *'
   workflow_dispatch:
 
 jobs:
@@ -9,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout tuo repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -18,36 +16,58 @@ jobs:
           git config user.name "GitHub Action Bot"
           git config user.email "action@github.com"
 
-      - name: Preleva codice dal Core Ufficiale
+      - name: Download File Core Ufficiale
         run: |
-          # Usiamo --depth 1 per scaricare solo l'ultimo stato del Core, molto più veloce
-          git remote add upstream https://github.com/home-assistant/core.git
-          git fetch upstream dev --depth 1
+          # Elimina il file locale esistente
+          rm -f custom_components/tuya/climate.py
           
-          # Creiamo il branch per il confronto
-          git checkout -b temp-upstream-compare
-          
-          # Estraiamo SOLO il file climate.py dal core
-          git checkout upstream/dev -- homeassistant/components/tuya/climate.py
-          
-          # Spostiamolo nella tua cartella custom_components
+          # Scarica la versione ufficiale
           mkdir -p custom_components/tuya/
-          mv homeassistant/components/tuya/climate.py custom_components/tuya/climate.py
+          curl -L https://raw.githubusercontent.com/home-assistant/core/dev/homeassistant/components/tuya/climate.py \
+            -o custom_components/tuya/climate.py
           
-          # Pulizia
-          rm -rf homeassistant/
+          # Verifica download
+          if [ ! -f custom_components/tuya/climate.py ]; then
+            echo "❌ Errore: File non scaricato"
+            exit 1
+          fi
           
-          git add custom_components/tuya/climate.py
-          git commit -m "Aggiornamento ufficiale dal Core del $(date +'%Y-%m-%d')"
-          git push origin temp-upstream-compare --force
+          echo "✅ File scaricato: $(wc -l < custom_components/tuya/climate.py) righe"
 
-      - name: Crea Pull Request con Conflitti
-        uses: peter-evans/create-pull-request@v5
+      - name: Crea Pull Request
+        uses: peter-evans/create-pull-request@v6 # Usa v6, più recente
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: temp-upstream-compare
+          delete-branch: true # Elimina il branch dopo il merge
           base: main
-          title: "⚠️ CONFLITTO RILEVATO: Allineamento Core"
+          commit-message: "🔄 Sostituzione con versione Core ufficiale"
+          title: "⚠️ CONFLITTO ATTESO: Allineamento Core"
           body: |
-            Il file `climate.py` del Core ufficiale è diverso dal tuo.
-            Risolvi i conflitti per mantenere il fix
+            ## 📋 Descrizione
+            
+            Questa PR contiene la versione **vergine** del file `climate.py` dal repository ufficiale Home Assistant Core.
+            
+            ### 🎯 Obiettivo
+            Confrontare le modifiche Cecotec con la versione upstream per identificare conflitti.
+            
+            ### ⚙️ Cosa è stato fatto
+            - ✅ Eliminato il file locale esistente
+            - ✅ Scaricato `climate.py` da `home-assistant/core@dev`
+            - ✅ Creato branch `temp-upstream-compare`
+            
+            ### ⚠️ Conflitti Attesi
+            GitHub dovrebbe mostrare automaticamente i conflitti tra:
+            - Le tue modifiche per i dispositivi Cecotec
+            - La versione ufficiale del Core
+            
+            ### 📝 Prossimi Passi
+            1. Rivedi i conflitti nella tab "Files changed"
+            2. Risolvi manualmente i conflitti mantenendo le modifiche Cecotec
+            3. Testa il codice risultante
+            
+            ---
+            *Generato automaticamente da GitHub Actions*
+          labels: |
+            sync
+            needs-review
