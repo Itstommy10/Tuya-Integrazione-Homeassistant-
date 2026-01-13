@@ -296,4 +296,5 @@ In const.py, aggiungi nella classe DPCode(StrEnum)::
     WORK_STATE_E = "work_state_e" WORK_STATE = "work_state"
 ```
 
-aggiunta implemnetazione anche per la category cs che si basa sul power e non sullo status
+- aggiunta implemnetazione anche per la category cs che si basa sul power e non sullo status
+- aggiunta implementazione di un action che controlla il repo ufficiale e notifica quali file sono stati cambiati per aver la custom integration sempre aggiornata
