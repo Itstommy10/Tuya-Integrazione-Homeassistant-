@@ -17,21 +17,23 @@ jobs:
 
       - name: Sincronizzazione Integrale Cartella Tuya
         run: |
-          # 1. Aggiungiamo il repository Core come upstream
+          # 1. Upstream e Fetch
           git remote add upstream https://github.com/home-assistant/core.git
           git fetch upstream dev --depth 1
           
-          # 2. Scarichiamo i file dal Core in una cartella temporanea
+          # 2. Prepariamo i nuovi file in temp
           mkdir -p /tmp/tuya_core
           git archive upstream/dev homeassistant/components/tuya/ | tar -x -C /tmp/tuya_core
           
-          # 3. Pulizia totale della tua cartella locale per evitare rimasugli
-          rm -rf custom_components/tuya/*
+          # 3. Rimuoviamo TUTTO dalla cartella locale e diciamo a Git di seguirci
+          # Usiamo 'git rm' per eliminare anche i .pyc vecchi dall'indice di Git
+          git rm -rf custom_components/tuya/ || rm -rf custom_components/tuya/*
+          mkdir -p custom_components/tuya/
           
-          # 4. Copia solo i file necessari (escludendo cache e compilati)
+          # 4. Copiamo i file nuovi dal Core
           cp -r /tmp/tuya_core/homeassistant/components/tuya/* custom_components/tuya/
           
-          # 5. RIMOZIONE FORZATA di file compilati e cache
+          # 5. Pulizia profonda file compilati (locali al runner)
           find custom_components/tuya/ -name "__pycache__" -type d -exec rm -rf {} +
           find custom_components/tuya/ -name "*.pyc" -delete
           
