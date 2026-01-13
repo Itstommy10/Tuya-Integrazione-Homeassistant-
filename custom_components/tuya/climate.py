@@ -446,25 +446,32 @@ class TuyaClimateEntity(TuyaEntity, ClimateEntity):
     @property
     def hvac_mode(self) -> HVACMode | None:
         """Return hvac mode."""
-        # Controllo dello switch fisico (se presente)
+        # 1. Recuperiamo la categoria del dispositivo
+        category = self._device.get('category')
+
+        # 2. Logica specifica per i Deumidificatori (category "cs")
+        if category == "cs":
+            # Il tuo JSON usa "Power" per l'accensione
+            is_on = self._device.get_status('Power')
+            if is_on is True:
+                return HVACMode.DRY
+            return HVACMode.OFF
+
+        # 3. Logica originale per tutti gli altri dispositivi
         switch_status = self._read_wrapper(self._switch_wrapper)
         if switch_status is False:
             return HVACMode.OFF
 
-        # Se non c'è un wrapper per il modo, ma lo switch è ON
         if self._hvac_mode_wrapper is None:
             if switch_status is True:
                 return self.entity_description.switch_only_hvac_mode
             return None
 
-        # Leggiamo lo stato dal cloud
         hvac_status = self._read_wrapper(self._hvac_mode_wrapper)
-        
-        # Se il cloud dice 'off' o è vuoto (None), ma lo switch non è esplicitamente False
+
         if hvac_status is None or hvac_status == "off":
-            # Se lo switch non esiste o è True, forziamo HEAT per evitare che sparisca
             return HVACMode.HEAT
-            
+
         return TUYA_HVAC_TO_HA.get(hvac_status, HVACMode.HEAT)
 
     # @property

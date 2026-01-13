@@ -2,7 +2,7 @@
   "domain": "tuya",
   "version": "2025.12.3-patch",
   "name": "Tuya",
-  "codeowners": ["@Tuya", "@zlinoliver"],
+  "codeowners": ["@Tuya", "@Itstommy10"],
   "config_flow": true,
   "dependencies": ["ffmpeg"],
   "dhcp": [
