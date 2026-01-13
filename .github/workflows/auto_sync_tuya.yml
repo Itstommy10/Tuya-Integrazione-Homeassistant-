@@ -1,7 +1,6 @@
 name: Sincronizzazione Reale Core (Forzata)
 on:
   workflow_dispatch:
-
 jobs:
   sync-core:
     runs-on: ubuntu-latest
@@ -18,26 +17,26 @@ jobs:
 
       - name: Sincronizzazione Integrale Cartella Tuya
         run: |
+          # 1. Aggiungiamo il repository Core come upstream
           git remote add upstream https://github.com/home-assistant/core.git
           git fetch upstream dev --depth 1
           
-          # Creiamo una cartella temporanea esterna per i nuovi file
+          # 2. Scarichiamo i file dal Core in una cartella temporanea
           mkdir -p /tmp/tuya_core
           git archive upstream/dev homeassistant/components/tuya/ | tar -x -C /tmp/tuya_core
           
-          # Torniamo (o restiamo) sul main per permettere a create-pull-request di lavorare
-          git checkout main
-          
-          # Sostituiamo i file nella tua cartella locale
+          # 3. Pulizia totale della tua cartella locale per evitare rimasugli
           rm -rf custom_components/tuya/*
+          
+          # 4. Copia solo i file necessari (escludendo cache e compilati)
           cp -r /tmp/tuya_core/homeassistant/components/tuya/* custom_components/tuya/
           
-          # Pulizia
-          rm -rf /tmp/tuya_core
+          # 5. RIMOZIONE FORZATA di file compilati e cache
+          find custom_components/tuya/ -name "__pycache__" -type d -exec rm -rf {} +
+          find custom_components/tuya/ -name "*.pyc" -delete
           
-          # NOTA: NON facciamo il commit qui. 
-          # Lasciamo che sia l'azione "create-pull-request" a vedere le modifiche 
-          # locali e a creare il branch/commit/PR tutto in un colpo solo.
+          # 6. Pulizia file temporanei
+          rm -rf /tmp/tuya_core
 
       - name: Crea Pull Request
         uses: peter-evans/create-pull-request@v6
@@ -46,13 +45,14 @@ jobs:
           branch: temp-upstream-compare
           delete-branch: true
           base: main
+          commit-message: "🔄 Sincronizzazione integrale con Core (solo sorgenti .py)"
           title: "⚠️ SINCRONIZZAZIONE TOTALE: Core vs Custom"
           body: |
-            Questa PR confronta l'intera cartella `custom_components/tuya/` con la versione ufficiale del Core.
+            Questa PR aggiorna tutti i file della cartella `tuya` prelevandoli dal Core ufficiale.
             
-            **File controllati:** Tutti i file nella cartella (climate.py, __init__.py, const.py, ecc.)
+            ### 🛠 Cosa è stato fatto:
+            - ✅ Scaricati tutti i file `.py`, `.json` e `manifest.json`.
+            - ❌ Esclusi automaticamente file `.pyc` e cartelle `__pycache__`.
             
-            **Istruzioni per PyCharm:**
-            1. Fai `Fetch` da PyCharm.
-            2. Confronta il tuo `main` con `origin/temp-upstream-compare`.
-            3. Risolvi i conflitti file per file mantenendo i tuoi fix Cecotec.
+            ### 📝 Note per il Merge:
+            Usa PyCharm per confrontare questa PR con il tuo `main` e reinserire i fix Cecotec dove necessario.
